@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nigeria Economic Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: #080C14;
+      color: #F0F4FF;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,245,255,0.012) 2px, rgba(0,245,255,0.012) 4px
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrap { position: relative; z-index: 1; }
+
+    header {
+      padding: 28px 40px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      background: rgba(8,12,20,0.95);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-title { font-size: 18px; font-weight: 600; color: #F0F4FF; }
+    .header-sub { font-size: 12px; color: #4A5568; margin-top: 4px; font-family: 'Space Mono', monospace; }
+
+    .live-badge {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; font-family: 'Space Mono', monospace;
+      color: #00FF88; border: 1px solid rgba(0,255,136,0.3);
+      border-radius: 99px; padding: 5px 12px;
+    }
+
+    .live-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #00FF88; box-shadow: 0 0 6px #00FF88;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .main {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      min-height: calc(100vh - 85px);
+    }
+
+    .sidebar {
+      border-right: 1px solid rgba(255,255,255,0.06);
+      padding: 32px 20px;
+      background: #0D1421;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .sidebar-label {
+      font-size: 10px; font-family: 'Space Mono', monospace;
+      letter-spacing: 0.12em; text-transform: uppercase; color: #4A5568;
+    }
+
+    .kpi-card {
+      background: #111827; border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px; padding: 18px 20px;
+      position: relative; overflow: hidden;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .kpi-card:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.12); }
+    .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+    .kpi-card.cyan::before  { background: linear-gradient(90deg, transparent, #00F5FF, transparent); }
+    .kpi-card.red::before   { background: linear-gradient(90deg, transparent, #FF3860, transparent); }
+    .kpi-card.amber::before { background: linear-gradient(90deg, transparent, #FFB800, transparent); }
+    .kpi-card.green::before { background: linear-gradient(90deg, transparent, #00FF88, transparent); }
+    .kpi-card.cyan  { box-shadow: 0 0 30px rgba(0,245,255,0.04); }
+    .kpi-card.red   { box-shadow: 0 0 30px rgba(255,56,96,0.04); }
+    .kpi-card.amber { box-shadow: 0 0 30px rgba(255,184,0,0.04); }
+    .kpi-card.green { box-shadow: 0 0 30px rgba(0,255,136,0.04); }
+
+    .kpi-label {
+      font-size: 10px; font-family: 'Space Mono', monospace;
+      color: #4A5568; letter-spacing: 0.08em;
+      text-transform: uppercase; margin-bottom: 10px;
+    }
+
+    .kpi-value {
+      font-size: 34px; font-weight: 700;
+      font-family: 'Space Mono', monospace;
+      line-height: 1; margin-bottom: 10px;
+    }
+
+    .kpi-card.cyan  .kpi-value { color:#00F5FF; text-shadow:0 0 20px rgba(0,245,255,0.5); }
+    .kpi-card.red   .kpi-value { color:#FF3860; text-shadow:0 0 20px rgba(255,56,96,0.5); }
+    .kpi-card.amber .kpi-value { color:#FFB800; text-shadow:0 0 20px rgba(255,184,0,0.5); }
+    .kpi-card.green .kpi-value { color:#00FF88; text-shadow:0 0 20px rgba(0,255,136,0.5); }
+
+    .kpi-delta { display:flex; align-items:center; gap:6px; font-size:11px; font-family:'Space Mono',monospace; }
+    .delta-up   { color: #FF3860; }
+    .delta-down { color: #00FF88; }
+    .delta-label { color: #4A5568; }
+
+    .divider { height:1px; background:rgba(255,255,255,0.06); }
+
+    .insight-card {
+      background: rgba(0,245,255,0.03);
+      border: 1px solid rgba(0,245,255,0.1);
+      border-radius: 10px; padding: 14px 16px;
+    }
+    .insight-title {
+      font-size: 10px; font-family:'Space Mono',monospace;
+      color:#00F5FF; letter-spacing:0.08em;
+      text-transform:uppercase; margin-bottom:8px;
+    }
+    .insight-text { font-size:12px; color:#8892A4; line-height:1.7; }
+
+    /* ── Right content ── */
+    .content {
+      padding: 28px 32px;
+      background: #080C14;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ── Chart grid 2x2 ── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      flex: 1;
+    }
+
+    /* ── Individual chart card ── */
+    .chart-card {
+      background: #0D1421;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 20px 22px;
+      transition: border-color 0.2s;
+    }
+    .chart-card:hover { border-color: rgba(255,255,255,0.1); }
+
+    .chart-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .chart-title { font-size: 13px; font-weight: 600; color: #F0F4FF; }
+    .chart-sub   { font-size: 10px; font-family:'Space Mono',monospace; color:#4A5568; margin-top:3px; }
+
+    .chart-badge {
+      font-size: 10px; font-family:'Space Mono',monospace;
+      padding: 3px 8px; border-radius: 4px;
+      letter-spacing: 0.06em;
+    }
+
+    .badge-cyan  { background:rgba(0,245,255,0.1);  color:#00F5FF; border:1px solid rgba(0,245,255,0.2); }
+    .badge-red   { background:rgba(255,56,96,0.1);  color:#FF3860; border:1px solid rgba(255,56,96,0.2); }
+    .badge-amber { background:rgba(255,184,0,0.1);  color:#FFB800; border:1px solid rgba(255,184,0,0.2); }
+    .badge-green { background:rgba(0,255,136,0.1);  color:#00FF88; border:1px solid rgba(0,255,136,0.2); }
+
+    /* ── Footer ── */
+    footer {
+      padding: 14px 40px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      background: #0D1421;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .footer-text { font-size:11px; font-family:'Space Mono',monospace; color:#4A5568; }
+    .footer-link { font-size:11px; font-family:'Space Mono',monospace; color:#00F5FF; text-decoration:none; opacity:0.7; }
+    .footer-link:hover { opacity:1; }
+
+    @media(max-width:900px) {
+      .main { grid-template-columns:1fr; }
+      .charts-grid { grid-template-columns:1fr; }
+      header { padding:16px 20px; }
+      .content { padding:16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <div class="header-title">Nigeria Economic Dashboard</div>
+      <div class="header-sub">2000 to 2024 -- World Bank Data</div>
+    </div>
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      WORLD BANK DATA
+    </div>
+  </header>
+
+  <div class="main">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-label">2024 Indicators</div>
+
+      <div class="kpi-card cyan">
+        <div class="kpi-label">GDP per Capita</div>
+        <div class="kpi-value">$2,325</div>
+        <div class="kpi-delta">
+          <span class="delta-up">&#9650; +$903</span>
+          <span class="delta-label">since 2000</span>
+        </div>
+      </div>
+
+      <div class="kpi-card red">
+        <div class="kpi-label">Headline Inflation</div>
+        <div class="kpi-value">33.2%</div>
+        <div class="kpi-delta">
+          <span class="delta-up">&#9650; +26.3pp</span>
+          <span class="delta-label">since 2000</span>
+        </div>
+      </div>
+
+      <div class="kpi-card amber">
+        <div class="kpi-label">Exchange Rate</div>
+        <div class="kpi-value">&#8358;1,479</div>
+        <div class="kpi-delta">
+          <span class="delta-up">&#9650; +1,377</span>
+          <span class="delta-label">NGN per USD since 2000</span>
+        </div>
+      </div>
+
+      <div class="kpi-card green">
+        <div class="kpi-label">Food Inflation</div>
+        <div class="kpi-value">40.9%</div>
+        <div class="kpi-delta">
+          <span class="delta-up">&#9650; +36.0pp</span>
+          <span class="delta-label">since 2000</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="insight-card">
+        <div class="insight-title">&#9889; Key Insight</div>
+        <div class="insight-text">
+          Nigeria's real economy grew every year from 2020 to 2024.
+          But the Naira's 129% devaluation made dollar GDP collapse
+          from $647B to $252B. The pain was a currency story,
+          not an economic one.
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="content">
+      <div class="charts-grid">
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">GDP per Capita</div>
+              <div class="chart-sub">Constant USD -- 2000 to 2024</div>
+            </div>
+            <span class="chart-badge badge-cyan">GROWTH</span>
+          </div>
+          <div id="chart-gdp" style="height:220px"></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Headline Inflation</div>
+              <div class="chart-sub">Annual % -- 2000 to 2024</div>
+            </div>
+            <span class="chart-badge badge-red">VOLATILE</span>
+          </div>
+          <div id="chart-inf" style="height:220px"></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Exchange Rate</div>
+              <div class="chart-sub">NGN per USD -- 2000 to 2024</div>
+            </div>
+            <span class="chart-badge badge-amber">CRITICAL</span>
+          </div>
+          <div id="chart-fx" style="height:220px"></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Food Inflation</div>
+              <div class="chart-sub">Annual % -- 2000 to 2024</div>
+            </div>
+            <span class="chart-badge badge-green">IMPACT</span>
+          </div>
+          <div id="chart-food" style="height:220px"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-text">Source: World Bank Open Data -- Built by Andabai Pinadowari Isaac -- github.com/andabaipina</div>
+    <a href="nigeria_simulation_dashboard.html" class="footer-link">View Simulation --&gt;</a>
+  </footer>
+
+</div>
+
+<script>
+const years = [2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,
+               2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+               2022,2023,2024];
+
+const gdp_pc    = [1421.68,1465.46,1644.4,1717.21,1824.8,1889.25,1949.16,
+                   2020.83,2098.28,2204.61,2315.47,2370.98,2403.65,2495.34,
+                   2583.62,2585.73,2481.81,2441.71,2431.78,2431.54,2228.69,
+                   2206.66,2254.29,2280.68,2324.6];
+
+const inflation = [6.93,18.87,12.88,14.03,15.0,17.86,8.23,5.39,11.58,12.54,
+                   13.74,10.83,12.22,8.5,8.05,9.01,15.7,16.5,12.1,11.4,
+                   13.25,16.95,18.85,24.66,33.24];
+
+const fx        = [101.7,111.23,120.58,129.22,132.89,131.27,128.65,125.81,
+                   118.57,148.88,150.3,153.86,157.5,157.31,158.55,192.44,
+                   253.49,305.79,306.08,306.92,358.81,401.15,425.98,645.19,
+                   1478.97];
+
+const food      = [4.9,17.2,10.1,12.8,14.2,16.9,7.1,4.9,14.8,13.1,14.2,
+                   9.2,10.1,9.3,7.8,8.5,15.5,19.2,13.5,13.1,16.6,22.9,
+                   23.7,32.7,40.9];
+
+// Shared layout settings for all charts
+const layout = {
+  paper_bgcolor: 'transparent',
+  plot_bgcolor:  'transparent',
+  margin: {t:8, r:12, b:36, l:48},
+  font: {family:'Space Mono, monospace', color:'#4A5568', size:9},
+  xaxis: {
+    gridcolor: 'rgba(255,255,255,0.04)',
+    linecolor: 'rgba(255,255,255,0.06)',
+    tickfont:  {color:'#4A5568', size:9},
+    tickcolor: 'rgba(255,255,255,0.04)',
+  },
+  yaxis: {
+    gridcolor: 'rgba(255,255,255,0.04)',
+    linecolor: 'transparent',
+    tickfont:  {color:'#4A5568', size:9},
+    zeroline:  false,
+  },
+  showlegend: false,
+  hovermode:  'x unified',
+  hoverlabel: {
+    bgcolor:    '#0D1421',
+    bordercolor:'rgba(0,245,255,0.3)',
+    font: {family:'Space Mono, monospace', size:11, color:'#F0F4FF'}
+  }
+};
+
+const config = {displayModeBar: false, responsive: true};
+
+// Helper — draws a glowing line chart
+function glowChart(divId, ydata, color, prefix, suffix) {
+  const glow = {
+    x: years, y: ydata,
+    type: 'scatter', mode: 'lines',
+    line: {color: color + '33', width: 8},
+    hoverinfo: 'skip', showlegend: false
+  };
+  const main = {
+    x: years, y: ydata,
+    type: 'scatter', mode: 'lines+markers',
+    line: {color: color, width: 2},
+    marker: {color: color, size: 4},
+    fill: 'tozeroy',
+    fillcolor: color.replace(')', ',0.05)').replace('rgb', 'rgba'),
+    hovertemplate: prefix + '%{y}' + suffix + '<extra></extra>'
+  };
+  const yaxis = prefix === '$'
+    ? {...layout.yaxis, tickprefix: '$'}
+    : {...layout.yaxis, ticksuffix: '%'};
+  Plotly.newPlot(divId, [glow, main], {...layout, yaxis}, config);
+}
+
+glowChart('chart-gdp',  gdp_pc,    'rgb(0,245,255)',  '$', '');
+glowChart('chart-inf',  inflation, 'rgb(255,56,96)',   '',  '%');
+glowChart('chart-fx',   fx,        'rgb(255,184,0)',   '',  '');
+glowChart('chart-food', food,      'rgb(0,255,136)',   '',  '%');
+</script>
+</body>
+</html>
